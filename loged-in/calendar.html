@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>CramWell | Calendar</title>
+	<link rel="stylesheet" href="../css/style.css">
+</head>
+
+<body>
+<header>
+		<div class="logo">
+			<img src="../image/cramWell.png" alt="CramWell Logo" style="width: 215px; height: auto;">
+		</div>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="tasks.html">Tasks</a>
+			<a href="calendar.html" class="active">Calendar</a>
+			<a href="about.html">About</a>
+			<a href="../loged-out/index.html" class="login-btn">Log Out</a>
+		</nav>
+	</header>
+
+<section class="content">
+  <h1>Study Calendar</h1>
+  <p>Plan and track your activities with CramWell’s simple calendar view.</p>
+
+  <div class="calendar-container">
+    <div>
+      <div class="month-nav">
+        <button id="prevMonth">&#9664;</button>
+        <h2 id="monthYear"></h2>
+        <button id="nextMonth">&#9654;</button>
+      </div>
+      <div id="calendar"></div>
+    </div>
+
+    <div class="event-box">
+      <h3>Add Event</h3>
+      <form id="eventForm">
+        <input type="date" id="eventDate" required>
+        <input type="text" id="eventTitle" placeholder="Event name" required>
+        <textarea id="eventNote" placeholder="Add note..." rows="2"></textarea><br>
+        <button type="submit">Add</button>
+      </form>
+      <div id="eventList"></div>
+    </div>
+  </div>
+</section>
+
+<script>
+const calendar = document.getElementById('calendar');
+const monthYear = document.getElementById('monthYear');
+const eventList = document.getElementById('eventList');
+
+// Saved events
+let events = JSON.parse(localStorage.getItem("events")) || {};
+
+let currentDate = new Date(); // Current month
+
+// Save events to local storage
+function saveEvents() {
+  localStorage.setItem("events", JSON.stringify(events));
+}
+
+// Calendar layout
+function renderCalendar(year, month) {
+  calendar.innerHTML = "";  // Clear old calendar
+
+  const firstDay = new Date(year, month, 1).getDay();    // Day number of 1st day
+  const daysInMonth = new Date(year, month + 1, 0).getDate(); // Total days in the month
+  const today = new Date();
+
+  // Didisplay yung month and year
+  monthYear.textContent = new Date(year, month).toLocaleString('default', {
+    month: 'long',
+    year: 'numeric'
+  });
+
+  // Blank boxes before 1st day
+  for (let i = 0; i < firstDay; i++) {
+    const blank = document.createElement("div");
+    blank.className = "day blank";
+    calendar.appendChild(blank);
+  }
+
+  // Days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateKey = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const dayBox = document.createElement("div");
+    dayBox.className = "day";
+
+    // Numbers 1 to 31
+    dayBox.innerHTML = `<strong>${day}</strong>`;
+
+    // Today's date
+    if (
+      day === today.getDate() &&
+      month === today.getMonth() &&
+      year === today.getFullYear()
+    ) {
+      dayBox.classList.add("current-day");
+    }
+
+    // Show events inside the day box
+    if (events[dateKey]) {
+      events[dateKey].forEach(ev => {
+        const evDiv = document.createElement("div");
+        evDiv.className = `event ${ev.done ? "done" : ""}`;
+        evDiv.textContent = ev.title;
+        dayBox.appendChild(evDiv);
+      });
+    }
+
+    // Clicking a day shows its event list
+    dayBox.onclick = () => showEvents(dateKey);
+
+    calendar.appendChild(dayBox);
+  }
+}
+
+// Show events on the right
+function showEvents(dateKey) {
+  eventList.innerHTML = `<h3>Events on ${dateKey}</h3>`;
+
+  const list = events[dateKey] || [];
+
+  if (list.length === 0) {
+    eventList.innerHTML += `<p>No events yet.</p>`;
+    return;
+  }
+
+  list.forEach((ev, index) => {
+    const item = document.createElement("div");
+    item.className = "event-item";
+
+    item.innerHTML = `
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" ${ev.done ? "checked" : ""} onchange="toggleDone('${dateKey}', ${index})">
+        <strong class="${ev.done ? "done" : ""}">${ev.title}</strong>
+      </label>
+      ${ev.note ? `<p class="note">📝 ${ev.note}</p>` : ""}
+      <button onclick="removeEvent('${dateKey}', ${index})" style="background:#e74c3c;">Delete</button>
+    `;
+
+    eventList.appendChild(item);
+  });
+}
+
+// Event done or not 
+function toggleDone(dateKey, index) {
+  events[dateKey][index].done = !events[dateKey][index].done;
+  saveEvents();
+  showEvents(dateKey);
+  renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+}
+
+// Delete event
+function removeEvent(dateKey, index) {
+  events[dateKey].splice(index, 1);
+
+  if (events[dateKey].length === 0) {
+    delete events[dateKey]; 
+  }
+
+  saveEvents();
+  showEvents(dateKey);
+  renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+}
+
+// Add event
+document.getElementById("eventForm").addEventListener("submit", e => {
+  e.preventDefault();
+
+  const date = document.getElementById("eventDate").value;
+  const title = document.getElementById("eventTitle").value.trim();
+  const note = document.getElementById("eventNote").value.trim();
+
+  if (!date || !title) return;
+
+  if (!events[date]) events[date] = [];
+
+  events[date].push({ title, note, done: false });
+
+  saveEvents();
+  e.target.reset();
+
+  const [year, month] = date.split("-").map(Number);
+  renderCalendar(year, month - 1);
+  showEvents(date);
+});
+
+// cycle to previous and next month
+document.getElementById("prevMonth").addEventListener("click", () => {
+  currentDate.setMonth(currentDate.getMonth() - 1);
+  renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+});
+
+document.getElementById("nextMonth").addEventListener("click", () => {
+  currentDate.setMonth(currentDate.getMonth() + 1);
+  renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+});
+
+// Display the current month when page loads
+renderCalendar(currentDate.getFullYear(), currentDate.getMonth());
+</script>
+
+</body>
+</html>
